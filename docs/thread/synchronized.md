@@ -1,4 +1,4 @@
-# synchronized 
+# synchronized
 
 ## synchronized 用法
 

@@ -46,7 +46,7 @@ public class FinalExample {
 
 **所以写 final 域的重排序规则可以确保：在对象引用为任意线程可见之前，对象的 final 域已经被正确初始化过了，而普通域不具有这个保障。**
 
-![](image/JMM-4.png ':size=50%')
+![](image/final-1.png ':size=50%')
 
 
 
@@ -60,7 +60,7 @@ public class FinalExample {
 
 **所以读 final 域的重排序规则可以确保：在读一个对象的 final 域之前，一定会先读包含这个 final 域的对象的引用。**
 
-![](image/JMM-5.png ':size=50%')
+![](image/final-2.png ':size=50%')
 
 
 
@@ -94,7 +94,7 @@ public class FinalReferenceExample {
 
 假设首先线程A执行  `writerOne()` ，执行后线程B执行 `writerTwo()` ，然后线程C执行 `reader()` 。下面是可能的执行时序图：
 
-![](image/JMM-6.png ':size=50%')
+![](image/final-3.png ':size=50%')
 
 
 
