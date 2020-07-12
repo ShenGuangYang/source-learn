@@ -6,14 +6,29 @@
   - [synchronized](thread/synchronized.md)
   - [CAS](thread/cas.md)
   - [AQS](thread/AQS.md)
-  - [lock](thread/lock.md)
+  - [ReentrantLock](thread/ReentrantLock.md)
+  - [ReentrantReadWriteLock](thread/ReentrantReadWriteLock.md)
+  - [ConcurrentHashMap](thread/ConcurrentHashMap.md)
+  - [ConcurrentLinkedQueue](thread/ConcurrentLinkedQueue.md)
   - [JUC](thread/JUC.md)
-
+  - [线程池](thread/线程池.md)
 
 - 分布式组件
+  - [zookeeper](distributed/zookeeper.md)
+  - [dubbo](distributed/dubbo.md)
+  - [nacos](distributed/nacos.md)
+  - [sentinel](distributed/sentinel.md)
 
-  - [dubbo](/)
-  - [nacos](/)
-  - [sentinel](/)
+- spring cloud 组件
+  - [spring cloud ribbon](springcloud/ribbon.md)
+  - [spring cloud feign](springcloud/feign.md)
+  - [spring cloud eureka](springcloud/eureka.md)
 
+- 消息中间件
+  - [kafka](mq/kafka.md)
+  - [RabbitMQ](mq/RabbitMQ.md)
+  - [RocketMQ](mq/RocketMQ.md)
 
+- 数据库
+  - [MySQL](database/mysql.md)
+  - [Redis](database/redis.md)

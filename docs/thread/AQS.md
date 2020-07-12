@@ -1,8 +1,8 @@
-## AQS
+# AQS
 
 AQS （AbstractQueueSynchronizer，队列同步器 ），是用来构建锁或者其他同步组件的基础框架。它使用一个 int 类型的成员变量表示同步状态，通过内置的 FIFO 队列来完成资源获取线程的排队工作。
 
-## 接口及示例
+# 接口及示例
 
 **AQS 可重写的方法**
 
@@ -74,9 +74,9 @@ public class Mutex implements Lock {
 }
 ```
 
-## 实现分析
+# 实现分析
 
-### 同步队列
+## 同步队列
 
 AQS 依赖内部的同步队列来完成同步状态的管理，当前线程获取同步状态失败时，同步器会将当前线程以及等待状态等信息构造成为一个节点并将其加入同步队列，同时会阻塞当前线程，当同步状态释放时，会把首节点中的线程唤醒，使其再次尝试获取同步状态。
 
@@ -92,11 +92,11 @@ AQS 依赖内部的同步队列来完成同步状态的管理，当前线程获�
 
 
 
-### AQS  队列结构
+## AQS  队列结构
 
 ![](image/AQS-1.png ':size=60%')
 
-### AQS 类结构
+## AQS 类结构
 
 
 
@@ -104,10 +104,10 @@ AQS 依赖内部的同步队列来完成同步状态的管理，当前线程获�
 
 ```java
 // 属性
-privatetransientvolatile Node head;// 同步队列头节点
-privatetransientvolatile Node tail;// 同步队列尾节点
-privatevolatileint state;// 当前锁的状态：0代表没有被占用，大于0代表锁已被线程占用(锁可以重入，每次重入都+1)
-privatetransient Thread exclusiveOwnerThread; // 继承自AbstractOwnableSynchronizer 持有当前锁的线程
+private transient volatile Node head;// 同步队列头节点
+private transient volatile Node tail;// 同步队列尾节点
+private volatile int state;// 当前锁的状态：0代表没有被占用，大于0代表锁已被线程占用(锁可以重入，每次重入都+1)
+private transient Thread exclusiveOwnerThread; // 继承自AbstractOwnableSynchronizer 持有当前锁的线程
 ```
 
 **方法**
@@ -142,13 +142,13 @@ tryReleaseShared(int arg)// 共享式释放同步状态；
 
 ```java
 // 同步队列的节点类
-staticfinalclass Node {}
+static final class Node {}
 ```
 
 **Node 类**
 
 ```java
-staticfinalclass Node {
+static final class Node {
     volatile Node prev;// 当前节点/线程的前驱节点
     volatile Node next;// 当前节点/线程的后继节点
     volatile Thread thread;// 每一个节点对应一个线程
@@ -165,7 +165,7 @@ staticfinalclass Node {
 }
 ```
 
-### 独占式同步状态获取与释放
+## 独占式同步状态获取与释放
 
 **抢占锁操作代码分析**
 
@@ -359,7 +359,7 @@ private void unparkSuccessor(Node node) {
 }
 ```
 
-### 共享式同步状态获取与释放
+## 共享式同步状态获取与释放
 
 共享式获取与独占式获取最主要的区别在于同一时刻释放有多个线程同时获取到同步状态。以文件读写为例，程序对文件进行读操作，那么这一时刻对于该文件的写操作均被阻塞，而读操作可以同时进行。写操作要求对资源的独占式访问，而读操作可以使共享式访问。
 
@@ -407,7 +407,7 @@ private void doAcquireShared(int arg) {
 }
 ```
 
-### 独占式超时获取同步状态
+## 独占式超时获取同步状态
 
 
 
@@ -468,9 +468,9 @@ private boolean doAcquireNanos(int arg, long nanosTimeout)
 
 
 
-## 自定义同步组件
+# 自定义同步组件
 
-### 共享锁demo
+## 共享锁demo
 
 通过前面对 AQS 进行的实现分析，来编写一个自定义同步组件来加深对 AQS 的理解。
 
@@ -584,7 +584,7 @@ public static class SleepUtils{
 }
 ```
 
-### 独占式demo
+## 独占式demo
 
 ```java
 public class Mutex implements Lock {
