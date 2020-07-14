@@ -13,7 +13,15 @@
   - [JUC](thread/JUC.md)
   - [线程池](thread/线程池.md)
 
+- spring
+  - [IoC、DI](spring/iocdi.md)
+  - [AOP](spring/aop.md)
+
 - 分布式组件
+  - [CAP 理论](distributed/CAP.md)
+  - [序列化机制](distributed/序列化.md)
+  - [容错机制](distributed/容错机制.md)
+  - [服务注册中心设计](distributed/服务注册中心.md)
   - [zookeeper](distributed/zookeeper.md)
   - [dubbo](distributed/dubbo.md)
   - [nacos](distributed/nacos.md)
