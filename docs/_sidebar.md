@@ -16,16 +16,20 @@
 - spring
   - [IoC、DI](spring/iocdi.md)
   - [AOP](spring/aop.md)
+  - [spring 面试题](spring/spring.md)
 
-- 分布式组件
+- 分布式基础理论
   - [CAP 理论](distributed/CAP.md)
   - [序列化机制](distributed/序列化.md)
   - [容错机制](distributed/容错机制.md)
   - [服务注册中心设计](distributed/服务注册中心.md)
-  - [zookeeper](distributed/zookeeper.md)
-  - [dubbo](distributed/dubbo.md)
-  - [nacos](distributed/nacos.md)
-  - [sentinel](distributed/sentinel.md)
+  - [分布式事务](distributed/分布式事务.md)
+
+- 分布式组件
+  - [zookeeper](distributed-components/zookeeper.md)
+  - [dubbo](distributed-components/dubbo.md)
+  - [nacos](distributed-components/nacos.md)
+  - [sentinel](distributed-components/sentinel.md)
 
 - spring cloud 组件
   - [spring cloud ribbon](springcloud/ribbon.md)
