@@ -789,22 +789,7 @@ private int incrementAndGetModulo(int modulo) {
 }
 ```
 
-### 总结
 
-Ribbon 默认使用循环负载均衡算法。
-
-Ribbon 默认的负载均衡器是ZoneAwareLoadBalancer（区域亲和负载均衡器），通过配置计算可用区的机器属性，来选择同区域的路由。
-
-可以使用自定义配置属性来更改或者启动的时候注入 Bean
-
-```yaml
-order-service:
-  ribbon:
-  	NFLoadBalancerClassName: com.study.MyLoadBalancer
-    NFLoadBalancerRuleClassName: com.study.MyRule
-```
-
-配置可参照 spring cloud 官网 中的 [7.2 Customizing the Ribbon Client](https://cloud.spring.io/spring-cloud-static/spring-cloud-netflix/2.2.0.RELEASE/reference/html/#customizing-the-ribbon-client) 章说明
 
 ## 心跳检测
 
@@ -1169,3 +1154,20 @@ public void updateZoneServerMapping(Map<String, List<Server>> map) {
 }
 ````
 
+
+## 总结
+
+Ribbon 默认使用循环负载均衡算法。
+
+Ribbon 默认的负载均衡器是ZoneAwareLoadBalancer（区域亲和负载均衡器），通过配置计算可用区的机器属性，来选择同区域的路由。
+
+可以使用自定义配置属性来更改或者启动的时候注入 Bean
+
+```yaml
+order-service:
+  ribbon:
+  	NFLoadBalancerClassName: com.study.MyLoadBalancer
+    NFLoadBalancerRuleClassName: com.study.MyRule
+```
+
+配置可参照 spring cloud 官网 中的 [7.2 Customizing the Ribbon Client](https://cloud.spring.io/spring-cloud-static/spring-cloud-netflix/2.2.0.RELEASE/reference/html/#customizing-the-ribbon-client) 章说明
