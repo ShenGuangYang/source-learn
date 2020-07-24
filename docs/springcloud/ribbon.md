@@ -96,6 +96,10 @@ public class UserController {
 
 从使用 Ribbon 组件来看，主要使用 spring boot AutoConfiguration 功能，扫描 `@LoadBalanced` 注解，并对添加注解的 RestTemplate 设置拦截器，调用订单接口时通过拦截器对请求 url 进行重构。
 
+源码总体运转流程图（可放大查看）：
+
+![ribbon](image/ribbon-1.png ":size=50%")
+
 
 
 ## AutoConfiguration 初始化  Bean
@@ -155,7 +159,7 @@ public class LoadBalancerAutoConfiguration {
 }
 ```
 
-## restTemplate 请求对 url 进行重构
+## restTemplate 请求对 url 进行重构并远程调用
 
 `RestTemplate.getForObject()` 内部链路调用（不细致介绍了），最后肯定会走到我们设置的`LoadBalancerInterceptor.intercept()`  的方法逻辑中
 
