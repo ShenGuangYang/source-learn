@@ -34,7 +34,7 @@
 
 - spring cloud 组件
   - [spring cloud ribbon](springcloud/ribbon.md)
-  - [spring cloud feign](springcloud/feign.md)
+  - [spring cloud openfeign](springcloud/openfeign.md)
   - [spring cloud eureka](springcloud/eureka.md)
 
 - 消息中间件

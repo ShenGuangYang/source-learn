@@ -1171,3 +1171,5 @@ order-service:
 ```
 
 配置可参照 spring cloud 官网 中的 [7.2 Customizing the Ribbon Client](https://cloud.spring.io/spring-cloud-static/spring-cloud-netflix/2.2.0.RELEASE/reference/html/#customizing-the-ribbon-client) 章说明
+
+:tada::tada::tada::tada::tada::tada::tada::tada::tada::tada::tada::tada::tada::tada::tada::tada:
