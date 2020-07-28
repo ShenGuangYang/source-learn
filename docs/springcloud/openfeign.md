@@ -76,7 +76,7 @@ public class Application {
 
 源码总体流程图
 
-
+![openfeign](image/openfeign-1.png ":size=50%")
 
 
 
@@ -622,4 +622,6 @@ public Response execute(Request request, Options options) throws IOException {
 ## 总结
 
 OpenFeign 其作用是简化接口的调用，将 http 调用转为 rpc 调用，让调用远程接口像同进程应用内的接口调用一样简单。与 dubbo 的 rpc 远程调用一样，通过动态代理实现接口的调用。feign 通过封装包装请求体、发送 http 请求、获取接口响应结果、序列化响应结果等接口调用动作来简化接口的调用。
+
+:tada::tada::tada::tada::tada::tada::tada::tada::tada:
 
