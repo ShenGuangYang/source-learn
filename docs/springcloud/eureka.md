@@ -586,11 +586,197 @@ public EurekaHttpResponse<Void> register(InstanceInfo info) {
 1. 在 Spring boot 启动时，由于自动装配机制将 CloudEurekaClient 注入到了容器，并且执行了构造方法，而在构造方法中有一个定时任务每 40s 会执行一次判断，判断实例信息是否发生了变化，如果是则发起服务注册的流程
 2. 在 Spring boot 启动时，通过 refresh() 方法，最终调用 StatusChangeListener.notify() 进行服务状态变更的监听，而这个监听的方法收到事件通知之后会去执行服务注册
 
-
-
-
-
 # Eureka Server 接受请求
+
+在服务注册时候，我们通过 http 请求通知服务端进行服务节点信息的维护存储。
+
+请求入口在：`com.netflix.eureka.resources.ApplicationResource#addInstance()`
+
+## ApplicationResource.addInstance()
+
+```java
+@POST
+@Consumes({"application/json", "application/xml"})
+public Response addInstance(InstanceInfo info,
+                            @HeaderParam(PeerEurekaNode.HEADER_REPLICATION) String isReplication) {
+    logger.debug("Registering instance {} (replication={})", info.getId(), isReplication);
+    // validate that the instanceinfo contains all the necessary required fields
+    // 省略部分代码 主要是参数校验
+
+    // handle cases where clients may be registering with bad DataCenterInfo with missing data
+    DataCenterInfo dataCenterInfo = info.getDataCenterInfo();
+    if (dataCenterInfo instanceof UniqueIdentifier) {
+        String dataCenterInfoId = ((UniqueIdentifier) dataCenterInfo).getId();
+        if (isBlank(dataCenterInfoId)) {
+            boolean experimental = "true".equalsIgnoreCase(serverConfig.getExperimental("registration.validation.dataCenterInfoId"));
+            if (experimental) {
+                String entity = "DataCenterInfo of type " + dataCenterInfo.getClass() + " must contain a valid id";
+                return Response.status(400).entity(entity).build();
+            } else if (dataCenterInfo instanceof AmazonInfo) {
+                AmazonInfo amazonInfo = (AmazonInfo) dataCenterInfo;
+                String effectiveId = amazonInfo.get(AmazonInfo.MetaDataKey.instanceId);
+                if (effectiveId == null) {
+                    amazonInfo.getMetadata().put(AmazonInfo.MetaDataKey.instanceId.getName(), info.getId());
+                }
+            } else {
+                logger.warn("Registering DataCenterInfo of type {} without an appropriate id", dataCenterInfo.getClass());
+            }
+        }
+    }
+	// 注册服务
+    // registry == PeerAwareInstanceRegistry
+    registry.register(info, "true".equals(isReplication));
+    return Response.status(204).build();  // 204 to be backwards compatible
+}
+```
+
+## PeerAwareInstanceRegistry.register()
+
+主要代码逻辑
+
+- leaseDuration 是续约过期时间，默认 90s，当服务端超过 90s 没有收到客户端心跳，则主动剔除节点
+- 调用 super.register() 发起服务注册
+- 将数据同步到集群中的其他节点上（实现简单，获取集群中的所有信息，逐个发起注册）
+
+```java
+public void register(final InstanceInfo info, final boolean isReplication) {
+    // 服务续约过期时间
+    int leaseDuration = Lease.DEFAULT_DURATION_IN_SECS;
+    if (info.getLeaseInfo() != null && info.getLeaseInfo().getDurationInSecs() > 0) {
+        // 自定义的心跳时间
+        leaseDuration = info.getLeaseInfo().getDurationInSecs();
+    }
+    // 服务注册
+    super.register(info, leaseDuration, isReplication);
+    // 数据同步到集群中的其他节点
+    replicateToPeers(Action.Register, info.getAppName(), info.getId(), info, null, isReplication);
+}
+```
+
+## AbstractInstanceRegistry.register()
+
+简单来说，Eureka-Server 的服务注册，实际上是将客户端传递过来的实例数据保存到 Eureka-Server 中 的 ConcurrentHashMap 中。
+
+```java
+public void register(InstanceInfo registrant, int leaseDuration, boolean isReplication) {
+    try {
+        read.lock();
+        // 从 registry 中获取当前实例信息
+        Map<String, Lease<InstanceInfo>> gMap = registry.get(registrant.getAppName());
+        // 增加注册次数到监控信息中
+        REGISTER.increment(isReplication);
+        // 如果当前服务是第一次注册，则初始化一个 ConcurrentHashMap
+        if (gMap == null) {
+            final ConcurrentHashMap<String, Lease<InstanceInfo>> gNewMap = new ConcurrentHashMap<String, Lease<InstanceInfo>>();
+            gMap = registry.putIfAbsent(registrant.getAppName(), gNewMap);
+            if (gMap == null) {
+                gMap = gNewMap;
+            }
+        }
+        // 从 registry 中查询已经存在的 Lease 信息
+        Lease<InstanceInfo> existingLease = gMap.get(registrant.getId());
+        // Retain the last dirty timestamp without overwriting it, if there is already a lease
+        // 当instance已经存在，那就和客户端的instance的信息做比较，时间最新的为有效的instance信息
+        if (existingLease != null && (existingLease.getHolder() != null)) {
+            Long existingLastDirtyTimestamp = existingLease.getHolder().getLastDirtyTimestamp();
+            Long registrationLastDirtyTimestamp = registrant.getLastDirtyTimestamp();
+            logger.debug("Existing lease found (existing={}, provided={}", existingLastDirtyTimestamp, registrationLastDirtyTimestamp);
+
+            // this is a > instead of a >= because if the timestamps are equal, we still take the remote transmitted
+            // InstanceInfo instead of the server local copy.
+            if (existingLastDirtyTimestamp > registrationLastDirtyTimestamp) {
+                logger.warn("There is an existing lease and the existing lease's dirty timestamp {} is greater" +
+                            " than the one that is being registered {}", existingLastDirtyTimestamp, registrationLastDirtyTimestamp);
+                logger.warn("Using the existing instanceInfo instead of the new instanceInfo as the registrant");
+                registrant = existingLease.getHolder();
+            }
+        } else {
+            // The lease does not exist and hence it is a new registration
+            // 当lease不存在，是未注册过的服务
+            synchronized (lock) {
+                if (this.expectedNumberOfClientsSendingRenews > 0) {
+                    // Since the client wants to register it, increase the number of clients sending renews
+                    this.expectedNumberOfClientsSendingRenews = this.expectedNumberOfClientsSendingRenews + 1;
+                    updateRenewsPerMinThreshold();
+                }
+            }
+            logger.debug("No previous lease information found; it is new registration");
+        }
+        // 构建一个 Lease 
+        Lease<InstanceInfo> lease = new Lease<InstanceInfo>(registrant, leaseDuration);
+        if (existingLease != null) {
+            // 当原来存在 lease 的信息时，设置 serviceUpTimestamp
+            // 保证服务启动的时间一直是第一次注册的那个时间
+            lease.setServiceUpTimestamp(existingLease.getServiceUpTimestamp());
+        }
+        gMap.put(registrant.getId(), lease);
+        // 添加到队列内
+        recentRegisteredQueue.add(new Pair<Long, String>(
+            System.currentTimeMillis(),
+            registrant.getAppName() + "(" + registrant.getId() + ")"));
+        // This is where the initial state transfer of overridden status happens
+        // 检查实例状态是否发生变化，如果是并且存在，则覆盖原来的状态
+        if (!InstanceStatus.UNKNOWN.equals(registrant.getOverriddenStatus())) {
+            logger.debug("Found overridden status {} for instance {}. Checking to see if needs to be add to the "
+                         + "overrides", registrant.getOverriddenStatus(), registrant.getId());
+            if (!overriddenInstanceStatusMap.containsKey(registrant.getId())) {
+                logger.info("Not found overridden id {} and hence adding it", registrant.getId());
+                overriddenInstanceStatusMap.put(registrant.getId(), registrant.getOverriddenStatus());
+            }
+        }
+        InstanceStatus overriddenStatusFromMap = overriddenInstanceStatusMap.get(registrant.getId());
+        if (overriddenStatusFromMap != null) {
+            logger.info("Storing overridden status {} from map", overriddenStatusFromMap);
+            registrant.setOverriddenStatus(overriddenStatusFromMap);
+        }
+
+        // Set the status based on the overridden status rules
+        InstanceStatus overriddenInstanceStatus = getOverriddenInstanceStatus(registrant, existingLease, isReplication);
+        registrant.setStatusWithoutDirty(overriddenInstanceStatus);
+
+        // If the lease is registered with UP status, set lease service up timestamp
+        // 得到instanceStatus，判断是否为up状态
+        if (InstanceStatus.UP.equals(registrant.getStatus())) {
+            lease.serviceUp();
+        }
+        // 设置注册类型为 ADDED
+        registrant.setActionType(ActionType.ADDED);
+        // 续约变更记录队列，记录了实时的每次变化，用于注册信息的增量获取
+        recentlyChangedQueue.add(new RecentlyChangedItem(lease));
+        registrant.setLastUpdatedTimestamp();
+        // 让缓存失效
+        invalidateCache(registrant.getAppName(), registrant.getVIPAddress(), registrant.getSecureVipAddress());
+        logger.info("Registered instance {}/{} with status {} (replication={})",
+                    registrant.getAppName(), registrant.getId(), registrant.getStatus(), isReplication);
+    } finally {
+        read.unlock();
+    }
+}
+```
+
+## 总结
+
+至此，我们服务端接受处理客户端的注册请求做了一个简单的分析。实际上 Eureka Server 会把客户端的地址信息保存到 ConcurrentHashMap 中存储，并且服务提供者与注册中心直接会建立一个心跳检测机制，用于监控服务提供者的健康状态。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -24,6 +24,7 @@
   - [容错机制](distributed/容错机制.md)
   - [服务注册中心设计](distributed/服务注册中心.md)
   - [分布式事务](distributed/分布式事务.md)
+  - [分布式锁](distributed/分布式锁.md)
   - [RPC](distributed/RPC.md)
   
 - 分布式组件
