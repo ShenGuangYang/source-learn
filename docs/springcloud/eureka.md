@@ -758,17 +758,77 @@ public void register(InstanceInfo registrant, int leaseDuration, boolean isRepli
 
 至此，我们服务端接受处理客户端的注册请求做了一个简单的分析。实际上 Eureka Server 会把客户端的地址信息保存到 ConcurrentHashMap 中存储，并且服务提供者与注册中心直接会建立一个心跳检测机制，用于监控服务提供者的健康状态。
 
+# Eureka Server 三级缓存
+
+在注册中心设计的架构中，我们在服务端肯定是存储有关客户端信息。通常的注册中心会存磁盘(Zookeeper)、数据库(Nacos)等，而 Eureka 则使用的是存储在内存中。
+
+Eureka Server 中注册服务存在三个变量：（registry、readWriteCacheMap、readOnlyCacheMap）保存服务注册信息，默认情况下定时任务会每隔 30s 将 readWriteCacheMap 同步到 readOnlyCacheMap，每隔 60s 清理超过 90s 未续约的节点， Eureka Client 每隔 30s 从 readOnlyCacheMap 拉取服务注册信息，而客户端服务的注册则推送到 registry 中。
+
+为什么要设计多级缓存呢？
+
+当大规模的服务注册和更新时，如果只是修改一个 ConcurrentHashMap 数据，那么会因为锁存在竞争，从而影响性能。而 Eureka 又是 AP 模型，只需要满足最终可用就可以了。所以在这里用到多级缓存来实现读写分离。
+
+## 服务注册会使得读写缓存失效
 
 
 
+```java
+public void invalidate(Key... keys) {
+    for (Key key : keys) {
+        logger.debug("Invalidating the response cache key : {} {} {} {}, {}",
+                     key.getEntityType(), key.getName(), key.getVersion(), key.getType(), key.getEurekaAccept());
+
+        readWriteCacheMap.invalidate(key);
+        Collection<Key> keysWithRegions = regionSpecificKeys.get(key);
+        if (null != keysWithRegions && !keysWithRegions.isEmpty()) {
+            for (Key keysWithRegion : keysWithRegions) {
+                logger.debug("Invalidating the response cache key : {} {} {} {} {}",
+                             key.getEntityType(), key.getName(), key.getVersion(), key.getType(), key.getEurekaAccept());
+                readWriteCacheMap.invalidate(keysWithRegion);
+            }
+        }
+    }
+}
+```
+
+## 缓存同步
+
+ResponseCacheImpl 的构造方法中，会启动一个定时任务，这个定时任务会定时检查写缓存中的数据变化，进行更新和同步。
+
+```java
+private TimerTask getCacheUpdateTask() {
+    return new TimerTask() {
+        @Override
+        public void run() {
+            logger.debug("Updating the client cache from response cache");
+            for (Key key : readOnlyCacheMap.keySet()) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Updating the client cache from response cache for key : {} {} {} {}",
+                                 key.getEntityType(), key.getName(), key.getVersion(), key.getType());
+                }
+                try {
+                    CurrentRequestVersion.set(key.getVersion());
+                    Value cacheValue = readWriteCacheMap.get(key);
+                    Value currentCacheValue = readOnlyCacheMap.get(key);
+                    if (cacheValue != currentCacheValue) {
+                        readOnlyCacheMap.put(key, cacheValue);
+                    }
+                } catch (Throwable th) {
+                    logger.error("Error while updating the client cache from response cache for key {}", key.toStringCompact(), th);
+                } finally {
+                    CurrentRequestVersion.remove();
+                }
+            }
+        }
+    };
+}
+```
 
 
 
+# Eureka Server 服务续约
 
-
-
-
-
+所谓的服务续约，其实就是一种心跳检查机制，客户端会定期发送心跳来续约。
 
 
 
