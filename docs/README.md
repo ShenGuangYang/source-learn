@@ -7,10 +7,32 @@
 
 
 - [ ] 并发编程
+  - [x] 线程基础
+  - [x] JMM
+  - [x] volatile
+  - [x] final
+  - [x] synchronized
+  - [x] CAS
+  - [x] AQS
+  - [x] ReentrantLock
+  - [ ] ReentrantReadWriteLock
+  - [ ] ConcurrentHashMap
+  - [ ] ConcurrentLinkedQueue
+  - [x] Conndition
+  - [x] J.U.C
+  - [ ] 线程池
 - [ ] spring
 - [ ] 分布式组件
 - [ ] spring cloud
+  - [x] ribbon
+  - [x] openfeign
+  - [ ] eureka 
+  - [ ] hytrix
 - [ ] 消息队列
-- [ ] 数据库	
+  - [ ] kafka
+  - [ ] rocketmq
+  - [ ] rabbitmq
+- [ ] 数据库
+  - [x] redis
+  - [ ] mysql
 
-哈哈哈，都没有写完。
