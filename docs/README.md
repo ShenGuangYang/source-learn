@@ -26,8 +26,8 @@
 - [ ] spring cloud
   - [x] ribbon
   - [x] openfeign
-  - [ ] eureka 
-  - [ ] hytrix
+  - [x] eureka 
+  - [ ] hystrix
 - [ ] 消息队列
   - [ ] kafka
   - [ ] rocketmq

@@ -56,6 +56,14 @@ eureka:
       defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/   #设置与 Eureka Server 交互的地址查询服务和注册服务都需要依赖这个地址(服务暴露的地址)
 ```
 
+# 服务注册流程图
+
+
+
+![eureka-2](image\eureka-2.png ':size=50%')
+
+
+
 # 服务注册源码分析
 
 要找到 Eureka 的服务注册入口，首先要知道 Spring 中的 SmartLifecycle 接口，当 Spring 容器加载完所有的 Bean 并且初始化之后，会继续回调实现了 SmartLifecycle 接口对应的方法（start方法）。
@@ -826,9 +834,911 @@ private TimerTask getCacheUpdateTask() {
 
 
 
-# Eureka Server 服务续约
+# 服务续约
 
-所谓的服务续约，其实就是一种心跳检查机制，客户端会定期发送心跳来续约。
+所谓的服务续约，其实就是一种心跳检测机制，客户端会定期发送心跳来续约。
+
+在客户端注册服务的时候，初始化了 `DiscoveryClient`，通过构造方法中的 initScheduledTasks() 方法创建心跳检测的定时任务。
+
+## DiscoveryClient.initScheduledTasks()
+
+```java
+private void initScheduledTasks() {
+    // 省略代码
+
+    if (clientConfig.shouldRegisterWithEureka()) {
+
+        // Heartbeat timer
+        // 心跳检测
+        heartbeatTask = new TimedSupervisorTask(
+            "heartbeat",
+            scheduler,
+            heartbeatExecutor,
+            renewalIntervalInSecs,
+            TimeUnit.SECONDS,
+            expBackOffBound,
+            new HeartbeatThread()
+        );
+        scheduler.schedule(
+            heartbeatTask,
+            renewalIntervalInSecs, TimeUnit.SECONDS);
+
+        // 省略代码
+    } else {
+        logger.info("Not registering with Eureka server per configuration");
+    }
+}
+```
+
+## HeartbeatThread.run()
+
+```java
+private class HeartbeatThread implements Runnable {
+
+    public void run() {
+        if (renew()) {
+            lastSuccessfulHeartbeatTimestamp = System.currentTimeMillis();
+        }
+    }
+}
+```
+
+## HeartbeatThread.renew()
+
+```java
+boolean renew() {
+    EurekaHttpResponse<InstanceInfo> httpResponse;
+    try {
+        // 请求服务端接口进行服务续约
+        // eurekaTransport.registrationClient = SessionedEurekaHttpClient
+        httpResponse = eurekaTransport.registrationClient.sendHeartBeat(instanceInfo.getAppName(), instanceInfo.getId(), instanceInfo, null);
+        logger.debug(PREFIX + "{} - Heartbeat status: {}", appPathIdentifier, httpResponse.getStatusCode());
+        if (httpResponse.getStatusCode() == Status.NOT_FOUND.getStatusCode()) {
+            REREGISTER_COUNTER.increment();
+            logger.info(PREFIX + "{} - Re-registering apps/{}", appPathIdentifier, instanceInfo.getAppName());
+            long timestamp = instanceInfo.setIsDirtyWithTime();
+            boolean success = register();
+            if (success) {
+                instanceInfo.unsetIsDirty(timestamp);
+            }
+            return success;
+        }
+        return httpResponse.getStatusCode() == Status.OK.getStatusCode();
+    } catch (Throwable e) {
+        logger.error(PREFIX + "{} - was unable to send heartbeat!", appPathIdentifier, e);
+        return false;
+    }
+}
+```
+
+## AbstractJerseyEurekaHttpClient.sendHeartBeat()
+
+向服务端发起请求，进行服务续约操作。
+
+```java
+public EurekaHttpResponse<InstanceInfo> sendHeartBeat(String appName, String id, InstanceInfo info, InstanceStatus overriddenStatus) {
+    String urlPath = "apps/" + appName + '/' + id;
+    ClientResponse response = null;
+    try {
+        WebResource webResource = jerseyClient.resource(serviceUrl)
+            .path(urlPath)
+            .queryParam("status", info.getStatus().toString())
+            .queryParam("lastDirtyTimestamp", info.getLastDirtyTimestamp().toString());
+        if (overriddenStatus != null) {
+            webResource = webResource.queryParam("overriddenstatus", overriddenStatus.name());
+        }
+        Builder requestBuilder = webResource.getRequestBuilder();
+        addExtraHeaders(requestBuilder);
+        response = requestBuilder.put(ClientResponse.class);
+        EurekaHttpResponseBuilder<InstanceInfo> eurekaResponseBuilder = anEurekaHttpResponse(response.getStatus(), InstanceInfo.class).headers(headersOf(response));
+        if (response.hasEntity() &&
+            !HTML.equals(response.getType().getSubtype())) { //don't try and deserialize random html errors from the server
+            eurekaResponseBuilder.entity(response.getEntity(InstanceInfo.class));
+        }
+        return eurekaResponseBuilder.build();
+    } finally {
+        if (logger.isDebugEnabled()) {
+            logger.debug("Jersey HTTP PUT {}/{}; statusCode={}", serviceUrl, urlPath, response == null ? "N/A" : response.getStatus());
+        }
+        if (response != null) {
+            response.close();
+        }
+    }
+}
+```
+
+
+
+## InstanceResource.renewLease()
+
+服务端主要就是修改
+
+```java
+@PUT
+public Response renewLease(
+    @HeaderParam(PeerEurekaNode.HEADER_REPLICATION) String isReplication,
+    @QueryParam("overriddenstatus") String overriddenStatus,
+    @QueryParam("status") String status,
+    @QueryParam("lastDirtyTimestamp") String lastDirtyTimestamp) {
+    boolean isFromReplicaNode = "true".equals(isReplication);
+    // 进行服务续约操作，就是更新 lastUpdateTimestamp
+    boolean isSuccess = registry.renew(app.getName(), id, isFromReplicaNode);
+
+    // Not found in the registry, immediately ask for a register
+    if (!isSuccess) {
+        logger.warn("Not Found (Renew): {} - {}", app.getName(), id);
+        return Response.status(Status.NOT_FOUND).build();
+    }
+    // Check if we need to sync based on dirty time stamp, the client
+    // instance might have changed some value
+    Response response;
+    if (lastDirtyTimestamp != null && serverConfig.shouldSyncWhenTimestampDiffers()) {
+        response = this.validateDirtyTimestamp(Long.valueOf(lastDirtyTimestamp), isFromReplicaNode);
+        // Store the overridden status since the validation found out the node that replicates wins
+        if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()
+            && (overriddenStatus != null)
+            && !(InstanceStatus.UNKNOWN.name().equals(overriddenStatus))
+            && isFromReplicaNode) {
+            registry.storeOverriddenStatusIfRequired(app.getAppName(), id, InstanceStatus.valueOf(overriddenStatus));
+        }
+    } else {
+        response = Response.ok().build();
+    }
+    logger.debug("Found (Renew): {} - {}; reply status={}", app.getName(), id, response.getStatus());
+    return response;
+}
+```
+
+
+
+# 服务发现
+
+在客户端注册服务的时候，初始化了 `DiscoveryClient`，通过构造方法中的 fetchRegistry() 方法获得服务端上的地址列表。
+
+## DiscoveryClient 构造方法
+
+```java
+DiscoveryClient(ApplicationInfoManager applicationInfoManager, EurekaClientConfig config, AbstractDiscoveryClientOptionalArgs args,
+                    Provider<BackupRegistry> backupRegistryProvider, EndpointRandomizer endpointRandomizer) {
+    // 省略代码
+	if (clientConfig.shouldFetchRegistry() && !fetchRegistry(false)) {
+        fetchRegistryFromBackup();
+    }
+    // 省略代码
+}
+```
+
+## DiscoveryClient.fetchRegistry()
+
+```java
+private boolean fetchRegistry(boolean forceFullRegistryFetch) {
+    Stopwatch tracer = FETCH_REGISTRY_TIMER.start();
+
+    try {
+        // If the delta is disabled or if it is the first time, get all
+        // applications
+        Applications applications = getApplications();
+		// 判断全量拉取或者增量拉取
+        if (clientConfig.shouldDisableDelta()
+            || (!Strings.isNullOrEmpty(clientConfig.getRegistryRefreshSingleVipAddress()))
+            || forceFullRegistryFetch
+            || (applications == null)
+            || (applications.getRegisteredApplications().size() == 0)
+            || (applications.getVersion() == -1)) //Client application does not have latest library supporting delta
+        {
+            logger.info("Disable delta property : {}", clientConfig.shouldDisableDelta());
+            logger.info("Single vip registry refresh property : {}", clientConfig.getRegistryRefreshSingleVipAddress());
+            logger.info("Force full registry fetch : {}", forceFullRegistryFetch);
+            logger.info("Application is null : {}", (applications == null));
+            logger.info("Registered Applications size is zero : {}",
+                        (applications.getRegisteredApplications().size() == 0));
+            logger.info("Application version is -1: {}", (applications.getVersion() == -1));
+            // 全量拉取
+            getAndStoreFullRegistry();
+        } else {
+            // 增量拉取
+            getAndUpdateDelta(applications);
+        }
+        applications.setAppsHashCode(applications.getReconcileHashCode());
+        logTotalInstances();
+    } catch (Throwable e) {
+        logger.error(PREFIX + "{} - was unable to refresh its cache! status = {}", appPathIdentifier, e.getMessage(), e);
+        return false;
+    } finally {
+        if (tracer != null) {
+            tracer.stop();
+        }
+    }
+
+    // Notify about cache refresh before updating the instance remote status
+    //将本地缓存更新的事件广播给所有已注册的监听器，注意该方法已被CloudEurekaClient类重写
+    onCacheRefreshed();
+	//检查刚刚更新的缓存中，有来自Eureka server的服务列表，其中包含了当前应用的状态， 
+    //当前实例的成员变量lastRemoteInstanceStatus，记录的是最后一次更新的当前应用状态， 
+    //上述两种状态在updateInstanceRemoteStatus方法中作比较 ，如果不一致，就更新 lastRemoteInstanceStatus，并且广播对应的事件
+    // Update remote status based on refreshed data held in the cache
+    updateInstanceRemoteStatus();
+
+    // registry was fetched successfully, so return true
+    return true;
+}
+```
+
+
+
+## DiscoveryClient.getAndStoreFullRegistry()
+
+从 eureka server 端获取服务注册中心的地址信息，然后更新并设置到本地缓存 localRegionApps。
+
+```java
+private void getAndStoreFullRegistry() throws Throwable {
+    long currentUpdateGeneration = fetchRegistryGeneration.get();
+
+    logger.info("Getting all instance registry info from the eureka server");
+
+    Applications apps = null;
+    EurekaHttpResponse<Applications> httpResponse = clientConfig.getRegistryRefreshSingleVipAddress() == null
+        ? eurekaTransport.queryClient.getApplications(remoteRegionsRef.get())
+        : eurekaTransport.queryClient.getVip(clientConfig.getRegistryRefreshSingleVipAddress(), remoteRegionsRef.get());
+    if (httpResponse.getStatusCode() == Status.OK.getStatusCode()) {
+        apps = httpResponse.getEntity();
+    }
+    logger.info("The response status is {}", httpResponse.getStatusCode());
+
+    if (apps == null) {
+        logger.error("The application is null for some reason. Not storing this information");
+    } else if (fetchRegistryGeneration.compareAndSet(currentUpdateGeneration, currentUpdateGeneration + 1)) {
+        localRegionApps.set(this.filterAndShuffle(apps));
+        logger.debug("Got full registry with apps hashcode {}", apps.getAppsHashCode());
+    } else {
+        logger.warn("Not updating applications as another thread is updating it already");
+    }
+}
+```
+
+
+
+## 服务端接受客户端查询请求
+
+客户端拉取服务端信息有两种方式：全量、增量。
+
+对于全量会调用 Eureka-Server 的 ApplicationsResource.getContainers() 方法，而增量会调用 ApplicationsResource.getContainerDifferential() 方法。
+
+
+
+## ApplicationsResource.getContainers()
+
+```java
+@GET
+public Response getContainers(@PathParam("version") String version,
+                              @HeaderParam(HEADER_ACCEPT) String acceptHeader,
+                              @HeaderParam(HEADER_ACCEPT_ENCODING) String acceptEncoding,
+                              @HeaderParam(EurekaAccept.HTTP_X_EUREKA_ACCEPT) String eurekaAccept,
+                              @Context UriInfo uriInfo,
+                              @Nullable @QueryParam("regions") String regionsStr) {
+
+    boolean isRemoteRegionRequested = null != regionsStr && !regionsStr.isEmpty();
+    String[] regions = null;
+    if (!isRemoteRegionRequested) {
+        EurekaMonitors.GET_ALL.increment();
+    } else {
+        regions = regionsStr.toLowerCase().split(",");
+        Arrays.sort(regions); // So we don't have different caches for same regions queried in different order.
+        EurekaMonitors.GET_ALL_WITH_REMOTE_REGIONS.increment();
+    }
+
+    // Check if the server allows the access to the registry. The server can
+    // restrict access if it is not
+    // ready to serve traffic depending on various reasons.
+    // EurekaServer无法提供服务，返回403
+    if (!registry.shouldAllowAccess(isRemoteRegionRequested)) {
+        return Response.status(Status.FORBIDDEN).build();
+    }
+    CurrentRequestVersion.set(Version.toEnum(version));
+    KeyType keyType = Key.KeyType.JSON;
+    String returnMediaType = MediaType.APPLICATION_JSON;
+    if (acceptHeader == null || !acceptHeader.contains(HEADER_JSON_VALUE)) {
+        keyType = Key.KeyType.XML;
+        returnMediaType = MediaType.APPLICATION_XML;
+    }
+
+    Key cacheKey = new Key(Key.EntityType.Application,
+                           ResponseCacheImpl.ALL_APPS,
+                           keyType, CurrentRequestVersion.get(), EurekaAccept.fromString(eurekaAccept), regions
+                          );
+
+    Response response;
+    if (acceptEncoding != null && acceptEncoding.contains(HEADER_GZIP_VALUE)) {
+        // 去缓存中去数据
+        response = Response.ok(responseCache.getGZIP(cacheKey))
+            .header(HEADER_CONTENT_ENCODING, HEADER_GZIP_VALUE)
+            .header(HEADER_CONTENT_TYPE, returnMediaType)
+            .build();
+    } else {
+        response = Response.ok(responseCache.get(cacheKey))
+            .build();
+    }
+    CurrentRequestVersion.remove();
+    return response;
+}
+```
+
+## ResponseCacheImpl.getGZIP()
+
+去缓存中读取数据
+
+```java
+public byte[] getGZIP(Key key) {
+    Value payload = getValue(key, shouldUseReadOnlyResponseCache);
+    if (payload == null) {
+        return null;
+    }
+    return payload.getGzipped();
+}
+```
+
+## ResponseCacheImpl.getValue()
+
+```java
+Value getValue(final Key key, boolean useReadOnlyCache) {
+    Value payload = null;
+    try {
+        if (useReadOnlyCache) {
+            // 读缓存中获取
+            final Value currentPayload = readOnlyCacheMap.get(key);
+            if (currentPayload != null) {
+                payload = currentPayload;
+            } else {
+                payload = readWriteCacheMap.get(key);
+                readOnlyCacheMap.put(key, payload);
+            }
+        } else {
+            payload = readWriteCacheMap.get(key);
+        }
+    } catch (Throwable t) {
+        logger.error("Cannot get value for key : {}", key, t);
+    }
+    return payload;
+}
+```
+
+
+
+# 服务下线
+
+在 DiscoveryClient 中有个 shutdown() 方法上有 @PreDestroy 注解。在 springboot 关闭之前，会调用这个方法。
+
+## DiscoveryClient.shutdown()
+
+```java
+@PreDestroy
+@Override
+public synchronized void shutdown() {
+    if (isShutdown.compareAndSet(false, true)) {
+        logger.info("Shutting down DiscoveryClient ...");
+
+        if (statusChangeListener != null && applicationInfoManager != null) {
+            applicationInfoManager.unregisterStatusChangeListener(
+                statusChangeListener.getId());
+        }
+
+        cancelScheduledTasks();
+
+        // If APPINFO was registered
+        if (applicationInfoManager != null
+            && clientConfig.shouldRegisterWithEureka()
+            && clientConfig.shouldUnregisterOnShutdown()) {
+            applicationInfoManager.setInstanceStatus(InstanceStatus.DOWN);
+            // 取消注册
+            unregister();
+        }
+
+        if (eurekaTransport != null) {
+            eurekaTransport.shutdown();
+        }
+
+        heartbeatStalenessMonitor.shutdown();
+        registryStalenessMonitor.shutdown();
+
+        Monitors.unregisterObject(this);
+
+        logger.info("Completed shut down of DiscoveryClient");
+    }
+}
+```
+
+## DiscoveryClient.unregister()
+
+```java
+void unregister() {
+    // It can be null if shouldRegisterWithEureka == false
+    if(eurekaTransport != null && eurekaTransport.registrationClient != null) {
+        try {
+            logger.info("Unregistering ...");
+            // 向服务端发起下线通知
+            EurekaHttpResponse<Void> httpResponse = eurekaTransport.registrationClient.cancel(instanceInfo.getAppName(), instanceInfo.getId());
+            logger.info(PREFIX + "{} - deregister  status: {}", appPathIdentifier, httpResponse.getStatusCode());
+        } catch (Exception e) {
+            logger.error(PREFIX + "{} - de-registration failed{}", appPathIdentifier, e.getMessage(), e);
+        }
+    }
+}
+```
+
+
+
+## InstanceResource.cancelLease()
+
+服务下线，主要就是删除节点信息，并失效对应节点的缓存
+
+```java
+@DELETE
+public Response cancelLease(
+    @HeaderParam(PeerEurekaNode.HEADER_REPLICATION) String isReplication) {
+    try {
+        boolean isSuccess = registry.cancel(app.getName(), id,
+                                            "true".equals(isReplication));
+
+        if (isSuccess) {
+            logger.debug("Found (Cancel): {} - {}", app.getName(), id);
+            return Response.ok().build();
+        } else {
+            logger.info("Not Found (Cancel): {} - {}", app.getName(), id);
+            return Response.status(Status.NOT_FOUND).build();
+        }
+    } catch (Throwable e) {
+        logger.error("Error (cancel): {} - {}", app.getName(), id, e);
+        return Response.serverError().build();
+    }
+
+}
+```
+
+
+
+# Eureka 自我保护机制
+
+Eureka Server 在运行期间会去统计心跳失败比例在 15 分钟之内是否低于 85%，如果低于 85%，Euerka Server 会认为当前实例的客户端与自己的心跳连接出现了网络故障，那么 Eureka Server 会把这些实例保护起来，让这些实例不会过期导致删除。
+
+这样做的目的是为了减少网络不稳定或者网络分区情况下，Eureka Server 将健康服务剔除下线的问题。
+
+从这个机制中，最重要的如何计算在规定时间内的心跳比例，这里的心跳比例是指所有服务的心跳总比例，而不是单指某一服务。
+
+核心的计算规则在 AbstractInstanceRegistry.updateRenewsPerMinThreshold() 方法中。
+
+## AbstractInstanceRegistry.updateRenewsPerMinThreshold()
+
+```java
+// 每分钟最小续约数
+protected volatile int numberOfRenewsPerMinThreshold;
+// 预期每分钟收到续约的客户端数量，取决于注册到 eureka-server 的服务数量
+protected volatile int expectedNumberOfClientsSendingRenews;
+
+protected void updateRenewsPerMinThreshold() {
+    // 自我保护的阈值 = 服务总数 * (60 / 客户端续约次数) * 自我保护续约百分比阀值因子
+    // 自我保护的阈值 = serverCount * （60/30）* 0.85
+    this.numberOfRenewsPerMinThreshold = (int) (this.expectedNumberOfClientsSendingRenews
+                                                * (60.0 / serverConfig.getExpectedClientRenewalIntervalSeconds())
+                                                * serverConfig.getRenewalPercentThreshold());
+}
+```
+
+根据自我保护机制的功能，想一想会有哪几个过程会对这个值进行更新操作
+
+- eureka-server 启动会初始化这个值
+- eureka-client 的注册、下线都会更新这个值
+- 定时任务监听
+
+## eureka-server 服务启动
+
+EurekaServerInitializerConfiguration 实现了 SmartLifecycle 接口，Springboot 启动会执行 EurekaServerInitializerConfiguration.run()。具体过程参照 服务注册分析。 
+
+### EurekaServerInitializerConfiguration.run()
+
+```java
+@Configuration(proxyBeanMethods = false)
+@Import(EurekaServerInitializerConfiguration.class)
+@ConditionalOnBean(EurekaServerMarkerConfiguration.Marker.class)
+@EnableConfigurationProperties({ EurekaDashboardProperties.class,
+		InstanceRegistryProperties.class })
+@PropertySource("classpath:/eureka/server.properties")
+public class EurekaServerAutoConfiguration implements WebMvcConfigurer {
+    	@Override
+	public void start() {
+		new Thread(() -> {
+			try {
+				// TODO: is this class even needed now?
+				eurekaServerBootstrap.contextInitialized(
+						EurekaServerInitializerConfiguration.this.servletContext);
+				log.info("Started Eureka Server");
+
+				publish(new EurekaRegistryAvailableEvent(getEurekaServerConfig()));
+				EurekaServerInitializerConfiguration.this.running = true;
+				publish(new EurekaServerStartedEvent(getEurekaServerConfig()));
+			}
+			catch (Exception ex) {
+				// Help!
+				log.error("Could not initialize Eureka servlet context", ex);
+			}
+		}).start();
+	}
+}
+```
+
+
+
+### EurekaServerBootstrap.contextInitialized()
+
+```java
+public void contextInitialized(ServletContext context) {
+    try {
+        initEurekaEnvironment();
+        initEurekaServerContext();
+
+        context.setAttribute(EurekaServerContext.class.getName(), this.serverContext);
+    }
+    catch (Throwable e) {
+        log.error("Cannot bootstrap eureka server :", e);
+        throw new RuntimeException("Cannot bootstrap eureka server :", e);
+    }
+}
+```
+
+### EurekaServerBootstrap.initEurekaServerContext()
+
+```java
+protected void initEurekaServerContext() throws Exception {
+    // For backward compatibility
+    JsonXStream.getInstance().registerConverter(new V1AwareInstanceInfoConverter(),
+                                                XStream.PRIORITY_VERY_HIGH);
+    XmlXStream.getInstance().registerConverter(new V1AwareInstanceInfoConverter(),
+                                               XStream.PRIORITY_VERY_HIGH);
+
+    if (isAws(this.applicationInfoManager.getInfo())) {
+        this.awsBinder = new AwsBinderDelegate(this.eurekaServerConfig,
+                                               this.eurekaClientConfig, this.registry, this.applicationInfoManager);
+        this.awsBinder.start();
+    }
+
+    EurekaServerContextHolder.initialize(this.serverContext);
+
+    log.info("Initialized server context");
+
+    // Copy registry from neighboring eureka node
+    int registryCount = this.registry.syncUp();
+    this.registry.openForTraffic(this.applicationInfoManager, registryCount);
+
+    // Register all monitoring statistics.
+    EurekaMonitors.registerAllStats();
+}
+```
+
+### PeerAwareInstanceRegistryImpl.openForTraffic()
+
+```java
+public void openForTraffic(ApplicationInfoManager applicationInfoManager, int count) {
+    // Renewals happen every 30 seconds and for a minute it should be a factor of 2.
+    this.expectedNumberOfClientsSendingRenews = count;
+    // 更新自我保护机制的阈值
+    updateRenewsPerMinThreshold();
+    logger.info("Got {} instances from neighboring DS node", count);
+    logger.info("Renew threshold is: {}", numberOfRenewsPerMinThreshold);
+    this.startupTime = System.currentTimeMillis();
+    if (count > 0) {
+        this.peerInstancesTransferEmptyOnStartup = false;
+    }
+    DataCenterInfo.Name selfName = applicationInfoManager.getInfo().getDataCenterInfo().getName();
+    boolean isAws = Name.Amazon == selfName;
+    if (isAws && serverConfig.shouldPrimeAwsReplicaConnections()) {
+        logger.info("Priming AWS connections for all replicas..");
+        primeAwsReplicas(applicationInfoManager);
+    }
+    logger.info("Changing status to UP");
+    applicationInfoManager.setInstanceStatus(InstanceStatus.UP);
+    super.postInit();
+}
+```
+
+
+
+## eureka-client 服务注册、下线
+
+### PeerAwareInstanceRegistryImpl.cancel()
+
+当服务提供者主动下线时，表示这个时候Eureka-Server要剔除这个服务提供者的地址，同时也代表这 这个心跳续约的阈值要发生变化。所以在 PeerAwareInstanceRegistryImpl.cancel 中可以看到数据的更新
+
+```java
+protected boolean internalCancel(String appName, String id, boolean isReplication) {
+    
+	// 省略代码
+    synchronized (lock) {
+        if (this.expectedNumberOfClientsSendingRenews > 0) {
+            // Since the client wants to cancel it, reduce the number of clients to send renews.
+            this.expectedNumberOfClientsSendingRenews = this.expectedNumberOfClientsSendingRenews - 1;
+            updateRenewsPerMinThreshold();
+        }
+    }
+
+    return true;
+}
+```
+
+
+
+### PeerAwareInstanceRegistryImpl.register()
+
+当有新的服务提供者注册到 eureka-server上时，需要增加续约的客户端数量，所以在register方法中会进行处理
+
+```java
+public void register(InstanceInfo registrant, int leaseDuration, boolean isReplication) {
+    // 省略代码
+    // The lease does not exist and hence it is a new registration
+    synchronized (lock) {
+        if (this.expectedNumberOfClientsSendingRenews > 0) {
+            // Since the client wants to register it, increase the number of clients sending renews
+            this.expectedNumberOfClientsSendingRenews = this.expectedNumberOfClientsSendingRenews + 1;
+            updateRenewsPerMinThreshold();
+        }
+    }
+    // 省略代码
+}
+```
+
+
+
+
+
+## 定时任务监听阈值变化
+
+### EurekaServerAutoConfiguration.eurekaServerContext()
+
+```java
+@Bean
+@ConditionalOnMissingBean
+public EurekaServerContext eurekaServerContext(ServerCodecs serverCodecs,
+                                               PeerAwareInstanceRegistry registry, PeerEurekaNodes peerEurekaNodes) {
+    return new DefaultEurekaServerContext(this.eurekaServerConfig, serverCodecs,
+                                          registry, peerEurekaNodes, this.applicationInfoManager);
+}
+```
+
+
+
+### DefaultEurekaServerContext.initialize()
+
+构造 DefaultEurekaServerContext 之后会执行 PostConstruct 注解内的方法
+
+```java
+@Inject
+public DefaultEurekaServerContext(EurekaServerConfig serverConfig,
+                                  ServerCodecs serverCodecs,
+                                  PeerAwareInstanceRegistry registry,
+                                  PeerEurekaNodes peerEurekaNodes,
+                                  ApplicationInfoManager applicationInfoManager) {
+    this.serverConfig = serverConfig;
+    this.serverCodecs = serverCodecs;
+    this.registry = registry;
+    this.peerEurekaNodes = peerEurekaNodes;
+    this.applicationInfoManager = applicationInfoManager;
+}
+
+@PostConstruct
+@Override
+public void initialize() {
+    logger.info("Initializing ...");
+    peerEurekaNodes.start();
+    try {
+        registry.init(peerEurekaNodes);
+    } catch (Exception e) {
+        throw new RuntimeException(e);
+    }
+    logger.info("Initialized");
+}
+```
+
+
+
+### PeerAwareInstanceRegistryImpl.init()
+
+```java
+public void init(PeerEurekaNodes peerEurekaNodes) throws Exception {
+    this.numberOfReplicationsLastMin.start();
+    this.peerEurekaNodes = peerEurekaNodes;
+    initializedResponseCache();
+    scheduleRenewalThresholdUpdateTask();
+    initRemoteRegionRegistry();
+
+    try {
+        Monitors.registerObject(this);
+    } catch (Throwable e) {
+        logger.warn("Cannot register the JMX monitor for the InstanceRegistry :", e);
+    }
+}
+```
+
+
+
+### PeerAwareInstanceRegistryImpl.scheduleRenewalThresholdUpdateTask()
+
+启动一个定时任务，15分钟定时轮循一次
+
+```java
+private void scheduleRenewalThresholdUpdateTask() {
+    timer.schedule(new TimerTask() {
+        @Override
+        public void run() {
+            updateRenewalThreshold();
+        }
+    }, serverConfig.getRenewalThresholdUpdateIntervalMs(),
+                   serverConfig.getRenewalThresholdUpdateIntervalMs());
+}
+```
+
+
+
+### PeerAwareInstanceRegistryImpl.updateRenewalThreshold()
+
+```java
+private void updateRenewalThreshold() {
+    try {
+        Applications apps = eurekaClient.getApplications();
+        int count = 0;
+        for (Application app : apps.getRegisteredApplications()) {
+            for (InstanceInfo instance : app.getInstances()) {
+                if (this.isRegisterable(instance)) {
+                    ++count;
+                }
+            }
+        }
+        synchronized (lock) {
+            // Update threshold only if the threshold is greater than the
+            // current expected threshold or if self preservation is disabled.
+            if ((count) > (serverConfig.getRenewalPercentThreshold() * expectedNumberOfClientsSendingRenews)
+                || (!this.isSelfPreservationModeEnabled())) {
+                this.expectedNumberOfClientsSendingRenews = count;
+                updateRenewsPerMinThreshold();
+            }
+        }
+        logger.info("Current renewal threshold is : {}", numberOfRenewsPerMinThreshold);
+    } catch (Throwable e) {
+        logger.error("Cannot update renewal threshold", e);
+    }
+}
+```
+
+
+
+## 自我保护机制的触发任务
+
+上面都是在更新自我保护机制的阈值，那么哪里会去检查这个阈值来触发自我保护机制呢？
+
+在 eureka-server 启动的时候，会调用 PeerAwareInstanceRegistryImpl.openForTraffic() 方法，而这个方法里面调用 super.postInit() 方法来创建自我保护机制的定时任务。
+
+### PeerAwareInstanceRegistryImpl.openForTraffic() 
+
+```java
+public void openForTraffic(ApplicationInfoManager applicationInfoManager, int count) {
+    // Renewals happen every 30 seconds and for a minute it should be a factor of 2.
+    this.expectedNumberOfClientsSendingRenews = count;
+    updateRenewsPerMinThreshold();
+    logger.info("Got {} instances from neighboring DS node", count);
+    logger.info("Renew threshold is: {}", numberOfRenewsPerMinThreshold);
+    this.startupTime = System.currentTimeMillis();
+    if (count > 0) {
+        this.peerInstancesTransferEmptyOnStartup = false;
+    }
+    DataCenterInfo.Name selfName = applicationInfoManager.getInfo().getDataCenterInfo().getName();
+    boolean isAws = Name.Amazon == selfName;
+    if (isAws && serverConfig.shouldPrimeAwsReplicaConnections()) {
+        logger.info("Priming AWS connections for all replicas..");
+        primeAwsReplicas(applicationInfoManager);
+    }
+    logger.info("Changing status to UP");
+    applicationInfoManager.setInstanceStatus(InstanceStatus.UP);
+    // 创建自我保护机制的定时任务
+    super.postInit();
+}
+```
+
+### AbstractInstanceRegistry.postInit()
+
+```java
+protected void postInit() {
+    renewsLastMin.start();
+    if (evictionTaskRef.get() != null) {
+        evictionTaskRef.get().cancel();
+    }
+    evictionTaskRef.set(new EvictionTask());
+    evictionTimer.schedule(evictionTaskRef.get(),
+                           serverConfig.getEvictionIntervalTimerInMs(),
+                           serverConfig.getEvictionIntervalTimerInMs());
+}
+```
+
+EvictionTask.run()
+
+```java
+public void run() {
+    try {
+        long compensationTimeMs = getCompensationTimeMs();
+        logger.info("Running the evict task with compensationTime {}ms", compensationTimeMs);
+        evict(compensationTimeMs);
+    } catch (Throwable e) {
+        logger.error("Could not run the evict task", e);
+    }
+}
+```
+
+
+
+### AbstractInstanceRegistry.evict()
+
+```java
+public void evict(long additionalLeaseMs) {
+    logger.debug("Running the evict task");
+	// 是否需要开启自我保护机制，如果需要，那么直接RETURE， 不需要继续往下执行了
+    if (!isLeaseExpirationEnabled()) {
+        logger.debug("DS: lease expiration is currently disabled.");
+        return;
+    }
+    
+	//这下面主要是做服务自动下线的操作的
+    // We collect first all expired items, to evict them in random order. For large eviction sets,
+    // if we do not that, we might wipe out whole apps before self preservation kicks in. By randomizing it,
+    // the impact should be evenly distributed across all applications.
+    List<Lease<InstanceInfo>> expiredLeases = new ArrayList<>();
+    for (Entry<String, Map<String, Lease<InstanceInfo>>> groupEntry : registry.entrySet()) {
+        Map<String, Lease<InstanceInfo>> leaseMap = groupEntry.getValue();
+        if (leaseMap != null) {
+            for (Entry<String, Lease<InstanceInfo>> leaseEntry : leaseMap.entrySet()) {
+                Lease<InstanceInfo> lease = leaseEntry.getValue();
+                if (lease.isExpired(additionalLeaseMs) && lease.getHolder() != null) {
+                    expiredLeases.add(lease);
+                }
+            }
+        }
+    }
+
+    // To compensate for GC pauses or drifting local time, we need to use current registry size as a base for
+    // triggering self-preservation. Without that we would wipe out full registry.
+    int registrySize = (int) getLocalRegistrySize();
+    int registrySizeThreshold = (int) (registrySize * serverConfig.getRenewalPercentThreshold());
+    int evictionLimit = registrySize - registrySizeThreshold;
+
+    int toEvict = Math.min(expiredLeases.size(), evictionLimit);
+    if (toEvict > 0) {
+        logger.info("Evicting {} items (expired={}, evictionLimit={})", toEvict, expiredLeases.size(), evictionLimit);
+
+        Random random = new Random(System.currentTimeMillis());
+        for (int i = 0; i < toEvict; i++) {
+            // Pick a random item (Knuth shuffle algorithm)
+            int next = i + random.nextInt(expiredLeases.size() - i);
+            Collections.swap(expiredLeases, i, next);
+            Lease<InstanceInfo> lease = expiredLeases.get(i);
+
+            String appName = lease.getHolder().getAppName();
+            String id = lease.getHolder().getId();
+            EXPIRED.increment();
+            logger.warn("DS: Registry: expired lease for {}/{}", appName, id);
+            internalCancel(appName, id, false);
+        }
+    }
+}
+```
+
+### PeerAwareInstanceRegistryImpl.isLeaseExpirationEnabled()
+
+```java
+public boolean isLeaseExpirationEnabled() {
+    //是否开启了自我保护机制，如果没有，则跳过，默认是开启 
+    // 计算是否需要开启自我保护，判断最后一分钟收到的续约数量是否大于 numberOfRenewsPerMinThreshold
+    if (!isSelfPreservationModeEnabled()) {
+        // The self preservation mode is disabled, hence allowing the instances to expire.
+        return true;
+    }
+    return numberOfRenewsPerMinThreshold > 0 && getNumOfRenewsInLastMin() > numberOfRenewsPerMinThreshold;
+}
+```
 
 
 
