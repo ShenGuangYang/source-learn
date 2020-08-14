@@ -21,15 +21,20 @@
   - [x] Conndition
   - [x] J.U.C
   - [ ] 线程池
-- [ ] spring
 - [ ] 分布式组件
+  - [ ] zookeeper
+- [ ] spring cloud alibaba
+  - [ ] dubbo
+  - [ ] nacos
+  - [ ] sentinel
+  - [ ] seata
 - [ ] spring cloud
   - [x] ribbon
   - [x] openfeign
   - [x] eureka 
   - [ ] hystrix
 - [ ] 消息队列
-  - [ ] kafka
+  - [x] kafka
   - [ ] rocketmq
   - [ ] rabbitmq
 - [ ] 数据库
