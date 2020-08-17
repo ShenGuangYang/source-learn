@@ -20,7 +20,7 @@
   - [ ] ConcurrentLinkedQueue
   - [x] Conndition
   - [x] J.U.C
-  - [ ] 线程池
+  - [x] 线程池
 - [ ] 分布式组件
   - [ ] zookeeper
 - [ ] spring cloud alibaba
