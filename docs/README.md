@@ -40,4 +40,4 @@
 - [ ] 数据库
   - [x] redis
   - [ ] mysql
-
+- [x] JVM
