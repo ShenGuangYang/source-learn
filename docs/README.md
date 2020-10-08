@@ -6,6 +6,24 @@
 
 
 
+git
+
+学习分库分表 mycat、shard-jdbc 2019
+
+spring cloud alibaba 2020
+
+spring cloud seata 2020
+
+jvm
+
+mysql
+
+jekins
+
+2018 bat 面试题分析
+
+
+
 - [ ] 并发编程
   - [x] 线程基础
   - [x] JMM
