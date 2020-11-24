@@ -6,24 +6,6 @@
 
 
 
-git
-
-学习分库分表 mycat、shard-jdbc 2019
-
-spring cloud alibaba 2020
-
-spring cloud seata 2020
-
-jvm
-
-mysql
-
-jekins
-
-2018 bat 面试题分析
-
-
-
 - [ ] 并发编程
   - [x] 线程基础
   - [x] JMM
@@ -40,7 +22,7 @@ jekins
   - [x] J.U.C
   - [x] 线程池
 - [ ] 分布式组件
-  - [ ] zookeeper
+  - [x] zookeeper
 - [ ] spring cloud alibaba
   - [ ] dubbo
   - [ ] nacos
@@ -50,7 +32,6 @@ jekins
   - [x] ribbon
   - [x] openfeign
   - [x] eureka 
-  - [ ] hystrix
 - [ ] 消息队列
   - [x] kafka
   - [ ] rocketmq
@@ -59,3 +40,4 @@ jekins
   - [x] redis
   - [ ] mysql
 - [x] JVM
+- [x] Git
