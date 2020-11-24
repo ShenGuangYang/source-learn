@@ -16,8 +16,9 @@
   - [x] AQS
   - [x] ReentrantLock
   - [ ] ReentrantReadWriteLock
-  - [ ] ConcurrentHashMap
-  - [ ] ConcurrentLinkedQueue
+  - [x] ConcurrentHashMap
+  - [x] ConcurrentLinkedQueue
+  - [x] LinkedBlockingQueue
   - [x] Conndition
   - [x] J.U.C
   - [x] 线程池

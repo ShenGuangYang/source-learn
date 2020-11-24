@@ -10,6 +10,7 @@
 - [ReentrantReadWriteLock](thread/ReentrantReadWriteLock.md)
 - [ConcurrentHashMap](thread/ConcurrentHashMap.md)
 - [ConcurrentLinkedQueue](thread/ConcurrentLinkedQueue.md)
+- [LinkedBlockingQueue](thread/LinkedBlockingQueue.md)
 - [Condition](thread/Condition.md)
 - [JUC](thread/JUC.md)
 - [线程池](thread/线程池.md)
