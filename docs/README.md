@@ -6,7 +6,7 @@
 
 
 
-- [ ] 并发编程
+- [x] 并发编程
   - [x] 线程基础
   - [x] JMM
   - [x] volatile
@@ -15,13 +15,13 @@
   - [x] CAS
   - [x] AQS
   - [x] ReentrantLock
-  - [ ] ReentrantReadWriteLock
   - [x] ConcurrentHashMap
   - [x] ConcurrentLinkedQueue
   - [x] LinkedBlockingQueue
   - [x] Conndition
   - [x] J.U.C
   - [x] 线程池
+  - [x] LocalThread
 - [ ] 分布式组件
   - [x] zookeeper
 - [ ] spring cloud alibaba
