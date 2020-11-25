@@ -1,5 +1,6 @@
 - [首页](/?id=内容简介)
 - [CAP 理论](distributed/CAP.md)
+- [BASE 理论](distributed/BASE.md)
 - [序列化机制](distributed/序列化.md)
 - [容错机制](distributed/容错机制.md)
 - [服务注册中心设计](distributed/服务注册中心.md)
