@@ -7,4 +7,5 @@
 - [分布式事务](distributed/分布式事务.md)
 - [分布式锁](distributed/分布式锁.md)
 - [RPC](distributed/RPC.md)
-
+- [幂等方案](distributed/幂等方案.md)
+- [全局唯一id](distributed/全局唯一id.md)
