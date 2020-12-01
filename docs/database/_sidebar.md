@@ -1,3 +1,2 @@
 - [首页](/?id=内容简介)
 - [MySQL](database/mysql.md)
-- [Redis](database/redis.md)

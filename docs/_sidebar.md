@@ -3,6 +3,7 @@
 - [Spring Cloud Alibaba](ali/)
 - [spring cloud](springcloud/)
 - [数据库](database/)
+- [缓存](cache/)
 - [JVM](jvm/)
 - [分布式组件](distributed-components/)
 - [消息中间件](mq/)

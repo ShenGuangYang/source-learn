@@ -53,8 +53,10 @@
   - [ ] rocketmq
   - [ ] rabbitmq
   
-- [ ] 数据库
+- [x] 缓存
   - [x] redis
+
+- [ ] 数据库
   - [ ] mysql
   
 - [x] JVM
