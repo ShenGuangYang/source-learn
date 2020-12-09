@@ -1,4 +1,5 @@
-- [首页](/?id=内容简介)
+该目录下主要是分布式基础理论的学习。
+主要包含以下内容：
 - [CAP 理论](distributed/CAP.md)
 - [BASE 理论](distributed/BASE.md)
 - [序列化机制](distributed/序列化.md)

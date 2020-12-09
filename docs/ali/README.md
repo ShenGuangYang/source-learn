@@ -1,6 +1,6 @@
-- [首页](/?id=内容简介)
-- [dubbo](ali/dubbo.md)
-- [nacos](ali/nacos.md)
-- [sentinel](ali/sentinel.md)
-- [seata](ali/seata.md)
-
+该目录下主要是针对 Spring Cloud Alibaba 组件的源码分析。
+主要包含以下组件：
+- [dubbo](ali/dubbo/)
+- [nacos](ali/nacos/)
+- [sentinel](ali/sentinel/)
+- [seata](ali/seata/)

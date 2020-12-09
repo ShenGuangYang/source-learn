@@ -1,4 +1,5 @@
-- [首页](/?id=内容简介)
+该目录下主要是多线程的学习。
+主要包含以下内容：
 - [线程基础](thread/线程基础.md)
 - [JMM](thread/JMM.md)
 - [volatile](thread/volatile.md)
