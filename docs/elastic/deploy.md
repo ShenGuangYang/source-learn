@@ -65,7 +65,7 @@ vm.max_map_count=262144
 ```conf
 # 各自的 jdk 解压目录
 export JAVA_HOME=/usr/local/java15/jdk-15.0.2
-export PATH=$JAVA_HOME/bin:$M2_HOME/bin:$PATH
+export PATH=$JAVA_HOME/bin:$PATH
 export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
 ```
 

@@ -1,2 +1,3 @@
-- [首页](/?id=内容简介)
-- [elastic 环境搭建](elastic/deploy.md)
+- [首页](/)
+- [环境搭建](elastic/deploy.md)
+- [索引使用](elastic/indices.md)
