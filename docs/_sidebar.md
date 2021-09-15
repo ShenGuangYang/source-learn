@@ -2,6 +2,7 @@
 - [分布式基础理论](distributed/)
 - [Spring Cloud Alibaba](ali/)
 - [spring cloud](springcloud/)
+- [spring 相关技术栈](spring/)
 - [数据库](database/)
 - [elastic stack](elastic/)
 - [缓存](cache/)
@@ -10,3 +11,4 @@
 - [消息中间件](mq/)
 - [Git](git/)
 - [Vagrant](vagrant/)
+- [k8s](k8s/)
