@@ -1,7 +1,6 @@
 # Vagrant 使用
 
 
-
 ## 使用 vagrant 创建并启动一个 CentOS7
 
 进入本地目录 `cd /data` , 然后执行 `vagrant init`：
@@ -416,4 +415,27 @@ Vagrant.configure(2) do |config|
   end
 end
 ```
+
+
+
+## 宿主机使用 ssh 命令连接虚拟机
+
+
+
+```bash
+sudo su root
+vi /etc/ssh/sshd_config
+找到PermitRootLogin设置为 yes
+找到PasswordAuthentication设置为yes
+保存后执行重启sshd
+service sshd restart
+```
+
+
+
+
+
+
+
+
 
