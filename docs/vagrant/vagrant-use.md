@@ -418,17 +418,28 @@ end
 
 
 
-## 宿主机使用 ssh 命令连接虚拟机
+## 宿主机使用 ssh 免密进入虚拟机
 
 
 
-```bash
-sudo su root
+```sh
+# 先进入虚拟机
+vagrant ssh centos7 # centos7 是设置的虚拟机名称，可以使用 vagrant status 查看
+## 在虚拟机中的操作
+# 进入 root 账号
+sudo -i
+# 编辑 ssh 配置文件
 vi /etc/ssh/sshd_config
-找到PermitRootLogin设置为 yes
-找到PasswordAuthentication设置为yes
-保存后执行重启sshd
+# 修改一下内容
+PasswordAuthentication yes
+PubkeyAuthentication yes
+PermitRootLogin yes
+# 将本机的 ~/.ssh/id_rsa.pub 复制到 虚拟机的 ~/.ssh/authorized_keys
+cp ~/{yours}/.ssh/id_rsa.pub > /root/.ssh/authorized_keys
+# 重启 ssh
 service sshd restart
+
+# 在宿主机就可以使用 ssh 远程到虚拟机了
 ```
 
 
