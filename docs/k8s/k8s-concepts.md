@@ -290,7 +290,7 @@ metadata:                        #必写，元数据
   name: nginx                    #必写，表示rs名称
   labels:                        #表示rs的标签
     app: nginx
-spec:                            #必写，表示rc的详细定义
+spec:                            #必写，表示rs的详细定义
   replicas: 3                    #表示受此Rs管理的Pod需要运行的副本数
   selector:                      #表示需要管理的Pod的label
     matchLabels:
@@ -395,7 +395,7 @@ kubectl scale rs nginx-deployment-5d59d67564 --replicas=5
 kubectl set image deployment nginx-deployment nginx=nginx:1.9.1
 ```
 
-7. **删除 RC**
+7. **删除 deployment**
 
 ```sh
 kubectl delete -f nginx_deployment.yaml
@@ -405,7 +405,33 @@ kubectl delete rs nginx-deployment
 
 
 
+### Deployent yaml 各内容说明
 
+```yaml
+# yaml格式对于Deployment的定义
+apiVersion: apps/v1				 #必写，版本号
+kind: Deployment                 #必写，类型
+metadata:                        #必写，元数据
+  name: nginx-deployment         #必写，表示Deployment名称
+  labels:                        #表示Deployment的标签
+    app: nginx
+spec:                            #必写，表示Deployment的详细定义
+  replicas: 3                    #表示受此Deployment管理的Pod需要运行的副本数
+  selector:                      #表示需要管理的Pod的label
+    matchLabels:
+      app: nginx
+  template:
+  	# 以下都是 pod 的相关信息
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.7.9
+        ports:
+        - containerPort: 80
+```
 
 
 
