@@ -372,7 +372,7 @@ kubectl apply -f nginx_deployment.yaml
 kubectl get pods 
 # 查看所有 pod 并提供更多信息
 kubectl get pods -o wide
-# 查看 rc
+# 查看 deployment
 kubectl get deployment
 ```
 
@@ -560,6 +560,8 @@ kubectl delete ns test-namespace
 
 ## Service
 
+上面已经讲完了各个 pod，pod 中部署的服务，那么 pod 互相如何进行通信呢？
+
 假设我们使用 Deployment 来运行你的后端服务，Deployment 可以动态的创建、销毁 pods。
 
 每个 Pod 都有自己的 IP 地址，但是在 Deployment 中，在同一时刻运行的 Pod 集合可能与稍后运行该应用程序的 Pod 集合不同。
@@ -568,21 +570,84 @@ kubectl delete ns test-namespace
 
 这就可以使用 service 组件，service 为一组 Pod 提供相同的 DNS 名， 并且可以在它们之间进行负载均衡。
 
+### Service 初体验
 
+1. **创建 whoami-deployment.yaml 文件**
 
+```sh
+cat <<EOF> whoami-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami-deployment
+  labels:
+    app: whoami
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: whoami
+  template:
+    metadata:
+      labels:
+        app: whoami
+    spec:
+      containers:
+      - name: whoami
+        image: jwilder/whoami
+        ports:
+        - containerPort: 8000
+EOF
+```
 
+2. **执行创建 pod 命令**
 
+```sh
+kubectl apply -f whoami-deployment.yaml
+```
 
+3. **查看pod是否启动成功**
 
+```sh
+# 查看所有 pod
+kubectl get pods 
+# 查看 deployment
+kubectl get deployment
+```
 
+4. **创建 whoami 的 service**
 
+```sh
+kubectl expose deployment whoami-deployment
+```
 
+5. **查看 whoami-service 的详细信息**
 
+```sh
+kubectl describe svc whoami-deployment
+kubectl get svc
+```
 
+6. **使用service提供的ip地址进行服务访问**
 
+```sh
+curl ip(whoami-deployment对应的ip)
+```
 
+7. **可以用一下yaml 代替 kubectl expose** 
 
-
-
-
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami-service
+spec:
+  selector:
+    app: whoami
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 9376
+  type: Cluster
+```
 
