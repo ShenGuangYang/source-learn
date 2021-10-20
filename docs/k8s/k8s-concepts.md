@@ -437,6 +437,137 @@ spec:                            #必写，表示Deployment的详细定义
 
 
 
+## [Labels and Selectors](https://kubernetes.io/zh/docs/concepts/overview/working-with-objects/labels/)
+
+在前面的 yaml 文件中有很多 label 标签配置，就是为了给一些资源打上标签。
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+  # 这里
+  labels:
+    app: nginx
+```
+
+这个 yaml 文件表明这是一个名称为 nginx-pod 的 pod，有一个label，key 为 app，value 为 nginx。
+
+我们可以将具有同一个 label 的 pod，交给 selector 管理。
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:             # 匹配具有同一个label属性的pod标签
+    matchLabels:
+      app: nginx         
+  template:             # 定义pod的模板
+    metadata:
+      labels:
+        app: nginx      # 定义当前pod的label属性，app为key，value为nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.7.9
+        ports:
+        - containerPort: 80
+```
+
+
+
+> 可以使用 `kubectl get pods --show-labels` 名称来查看对应资源的标签。
+>
+> 当selector匹配不上的结果执行会报错。
+
+
+
+## [Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+
+简单来说，namespace 就是为了隔离不同的资源，比如：Pod、Service、Deployment等。这就可以用 namespace 来部署不同的环境，比如开发环境、测试环境、预发环境、生产环境等等。
+
+### Namespace 初体验
+
+1. **查看 namespace 是否启动成功**
+
+```sh
+# 查看所有 namespace
+kubectl get namespace/ns 
+```
+
+2. **创建 namespace.yaml 文件**
+
+```sh
+cat <<EOF> namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-namespace
+EOF
+```
+
+2. **执行创建 namespace 命令**
+
+```sh
+kubectl apply -f namespace.yaml
+```
+
+3. **查看 namespace 是否启动成功** 
+
+```sh
+# 查看所有 namespace
+kubectl get namespace/ns 
+```
+
+4. **在新建的 namespace 下面创建 pod**
+
+```yaml
+kubectl apply -f nginx_pod.yaml -n test-namespace
+```
+
+5. **在不同的 namespace 中查看刚刚新建的pod**
+
+```sh
+# 未指定 namespace 就是使用的 default 
+kubectl get pods 
+# 在 test-namespace 下查看 pods
+kubectl get pods -n test-namespace
+```
+
+6. **老是指定 namespace 很麻烦，可以设置一个默认的 namespace 替换 default**
+
+```yaml
+# 设置默认的 namespace
+kubectl config set-context --current --namespace=test-namespace
+# 校验是否设置成功
+kubectl config view --minify | grep namespace:
+```
+
+7. **删除 test-namespace**
+
+```sh
+kubectl delete -f namespace.yaml
+# 或者
+kubectl delete ns test-namespace
+```
+
+
+
+## Service
+
+假设我们使用 Deployment 来运行你的后端服务，Deployment 可以动态的创建、销毁 pods。
+
+每个 Pod 都有自己的 IP 地址，但是在 Deployment 中，在同一时刻运行的 Pod 集合可能与稍后运行该应用程序的 Pod 集合不同。
+
+这导致了一个问题： 如果一组 Pod（称为“后端”）为集群内的其他 Pod（称为“前端”）提供功能， 那么前端如何找出并跟踪要连接的 IP 地址，以便前端可以使用提供工作负载的后端部分？
+
+这就可以使用 service 组件，service 为一组 Pod 提供相同的 DNS 名， 并且可以在它们之间进行负载均衡。
+
 
 
 
