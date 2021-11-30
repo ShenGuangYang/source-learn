@@ -1,4 +1,4 @@
-# k8s 环境搭建
+# k8s kubeadm搭建
 
 
 
