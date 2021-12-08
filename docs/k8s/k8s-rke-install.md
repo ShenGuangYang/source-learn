@@ -174,7 +174,7 @@ sudo sysctl --system"
 
 下载 rke 的可执行文件： [Releases · rancher/rke](https://link.zhihu.com/?target=http%3A//github.com/rancher/rke/releases)
 
-**国内由于各种原因可能会很慢，这里推荐一个网站：[下载](https://link.zhihu.com/?target=https%3A//d.serctl.com/) 直接起飞**
+**国内由于各种原因可能会很慢，这里推荐一个网站：[下载](https://d.serctl.com) 直接起飞**
 
 ```
 mv rke_linux-amd64 /usr/local/bin/rke
