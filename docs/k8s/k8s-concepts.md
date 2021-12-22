@@ -570,7 +570,9 @@ kubectl delete ns test-namespace
 
 这就可以使用 service 组件，service 为一组 Pod 提供相同的 DNS 名， 并且可以在它们之间进行负载均衡。
 
-### Service 初体验
+### Cluster Service
+
+不同的 pod 间的内部相互通信，可以使用默认的 Service。
 
 1. **创建 whoami-deployment.yaml 文件**
 
@@ -631,6 +633,7 @@ kubectl get svc
 6. **使用service提供的ip地址进行服务访问**
 
 ```sh
+kubectl exec -it [pod-name] -- sh
 curl ip(whoami-deployment对应的ip)
 ```
 
@@ -650,4 +653,121 @@ spec:
       targetPort: 9376
   type: Cluster
 ```
+
+
+
+### NodePort Service
+
+如果集群外需要访问集群 pod 内的服务，可以使用 NodePort 类型的 Service。这个方式是通过在各个节点机器上启动一个端口，通过访问该端口的请求转发到 pod内。
+
+
+
+1. **创建 whoami-deployment.yaml 文件**
+
+```sh
+cat <<EOF> whoami-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami-deployment
+  labels:
+    app: whoami
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: whoami
+  template:
+    metadata:
+      labels:
+        app: whoami
+    spec:
+      containers:
+      - name: whoami
+        image: jwilder/whoami
+        ports:
+        - containerPort: 8000
+EOF
+```
+
+2. **执行创建 pod 命令**
+
+```sh
+kubectl apply -f whoami-deployment.yaml
+```
+
+3. **查看pod是否启动成功**
+
+```sh
+# 查看所有 pod
+kubectl get pods 
+# 查看 deployment
+kubectl get deployment
+```
+
+4. **创建 whoami 的 service**
+
+```sh
+kubectl expose deployment whoami-deployment --type=NodePort
+```
+
+5. **查看 whoami-service 的详细信息**
+
+```sh
+kubectl describe svc whoami-deployment
+kubectl get svc
+```
+
+6. **使用service提供的ip地址进行服务访问**
+
+```sh
+curl ip:port(node对应的ip+service对应的port)
+```
+
+7. **可以用一下yaml 代替 kubectl expose** 
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami-service
+spec:
+  selector:
+    app: whoami
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 9376
+  type: NodePort
+```
+
+
+
+## Ingress
+
+NodePort虽然能够实现外部访问Pod的需求，但是真的好吗？其实不好，占用了各个物理主机上的端口。
+
+可以使用 Ingress 来解决 NodePort 问题。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
