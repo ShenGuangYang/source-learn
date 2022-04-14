@@ -8,8 +8,6 @@ docker: 镜像的运行时实例为容器
 
 k8s: pod 中运行的容器（可以运行多个 Container）
 
-
-
 ## [Pod](https://kubernetes.io/docs/concepts/workloads/pods/)
 
 `官网:`  *Pod* 是可以在 Kubernetes 中创建和管理的、最小的可部署的计算单元。
@@ -66,8 +64,6 @@ kubectl delete pod nginx-pod
 kubectl delete -f nginx_pod.yaml
 ```
 
-
-
 ### Pod yaml 各内容说明
 
 ```yaml
@@ -87,8 +83,6 @@ spec:                           #必写，pod中容器的详细定义
     - containerPort: 80         #表示容器的端口
 ```
 
-
-
 ## [ReplcationController(RC)](https://kubernetes.io/zh/docs/concepts/workloads/controllers/replicationcontroller/)
 
 `官网:`  *ReplicationController* 确保在任何时候都有特定数量的 *Pod* 副本处于运行状态。 换句话说，*ReplicationController* 确保一个 *Pod* 或一组同类的 *Pod* 总是可用的。
@@ -100,8 +94,6 @@ spec:                           #必写，pod中容器的详细定义
 - 当Pod的副本数量小于预期数量时，用于创建新Pod的Pod模板（template）
 
 也就是说通过RC实现了集群中Pod的高可用，减少了传统IT环境中手工运维的工作。（包括服务高可用、服务宕机自动重启等）
-
-
 
 ### ReplicationController 初体验
 
@@ -169,13 +161,11 @@ kubectl delete -f nginx_rc.yaml
 kubectl delete rc nginx
 ```
 
-
-
 ### ReplicationController yaml 各内容说明
 
 ```yaml
 # yaml格式对于rc的定义
-apiVersion: v1					 #必写，版本号
+apiVersion: v1                     #必写，版本号
 kind: ReplicationController      #必写，类型
 metadata:                        #必写，元数据
   name: nginx                    #必写，表示rc名称
@@ -197,19 +187,13 @@ spec:                            #必写，表示rc的详细定义
         - containerPort: 80
 ```
 
-
-
 ## [ReplicationSet(RS)](https://kubernetes.io/zh/docs/concepts/workloads/controllers/replicaset/)
 
 `官网:`  ReplicaSet 的目的是维护一组在任何时候都处于运行状态的 Pod 副本的稳定集合。 因此，它通常用来保证给定数量的、完全相同的 Pod 的可用性。
 
 v1.2时，RC 就升级成了另外一个概念：Replica Set，官方解释为“下一代RC”。
 
-
-
 ### ReplicaSet 初体验
-
-
 
 1. **创建 nginx_rs.yaml 文件**
 
@@ -278,13 +262,11 @@ kubectl delete -f nginx_rs.yaml
 kubectl delete rs nginx
 ```
 
-
-
 ### ReplicaSet yaml 各内容说明
 
 ```yaml
 # yaml格式对于rs的定义
-apiVersion: apps/v1				 #必写，版本号
+apiVersion: apps/v1                 #必写，版本号
 kind: ReplicaSet                 #必写，类型
 metadata:                        #必写，元数据
   name: nginx                    #必写，表示rs名称
@@ -296,7 +278,7 @@ spec:                            #必写，表示rs的详细定义
     matchLabels:
       app: nginx
   template:                       #表示用于定义Pod的模板
-  	# 以下都是 pod 的相关信息
+      # 以下都是 pod 的相关信息
     metadata:
       name: nginx
       labels:
@@ -309,15 +291,11 @@ spec:                            #必写，表示rs的详细定义
         - containerPort: 80
 ```
 
-
-
 ### RC 与 RS 如何选择？
 
 RS 是 RC 的升级版本，两者功能相似。但 RS 的功能更加齐全，应当优先选择 RS。 [官网说明](https://kubernetes.io/zh/docs/concepts/workloads/controllers/replicaset/#replicationcontroller)
 
 RS 与 RC 唯一的区别是：RS 支持基于集合的 Label Selector（Set-based selector），而 RC 只支持基于等式的 Label Selector（equality-based selector），这使得 Replica Set 的功能更强。
-
-
 
 ## [Deployment](https://kubernetes.io/zh/docs/concepts/workloads/controllers/deployment/)
 
@@ -325,11 +303,7 @@ RS 与 RC 唯一的区别是：RS 支持基于集合的 Label Selector（Set-bas
 
 `官网:`  你负责描述 Deployment 中的 *目标状态*，而 Deployment [控制器（Controller）](https://kubernetes.io/zh/docs/concepts/architecture/controller/) 以受控速率更改实际状态， 使其变为期望状态。你可以定义 Deployment 以创建新的 ReplicaSet，或删除现有 Deployment， 并通过新的 Deployment 收养其资源。
 
-
-
 ### Deployent 初体验
-
-
 
 1. **创建 nginx_deployment.yaml 文件**
 
@@ -403,13 +377,11 @@ kubectl delete -f nginx_deployment.yaml
 kubectl delete rs nginx-deployment
 ```
 
-
-
 ### Deployent yaml 各内容说明
 
 ```yaml
 # yaml格式对于Deployment的定义
-apiVersion: apps/v1				 #必写，版本号
+apiVersion: apps/v1                 #必写，版本号
 kind: Deployment                 #必写，类型
 metadata:                        #必写，元数据
   name: nginx-deployment         #必写，表示Deployment名称
@@ -421,7 +393,7 @@ spec:                            #必写，表示Deployment的详细定义
     matchLabels:
       app: nginx
   template:
-  	# 以下都是 pod 的相关信息
+      # 以下都是 pod 的相关信息
     metadata:
       labels:
         app: nginx
@@ -432,10 +404,6 @@ spec:                            #必写，表示Deployment的详细定义
         ports:
         - containerPort: 80
 ```
-
-
-
-
 
 ## [Labels and Selectors](https://kubernetes.io/zh/docs/concepts/overview/working-with-objects/labels/)
 
@@ -466,7 +434,7 @@ spec:
   replicas: 3
   selector:             # 匹配具有同一个label属性的pod标签
     matchLabels:
-      app: nginx         
+      app: nginx     
   template:             # 定义pod的模板
     metadata:
       labels:
@@ -479,13 +447,9 @@ spec:
         - containerPort: 80
 ```
 
-
-
 > 可以使用 `kubectl get pods --show-labels` 名称来查看对应资源的标签。
 >
 > 当selector匹配不上的结果执行会报错。
-
-
 
 ## [Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
 
@@ -517,7 +481,7 @@ EOF
 kubectl apply -f namespace.yaml
 ```
 
-3. **查看 namespace 是否启动成功** 
+3. **查看 namespace 是否启动成功**
 
 ```sh
 # 查看所有 namespace
@@ -555,8 +519,6 @@ kubectl delete -f namespace.yaml
 # 或者
 kubectl delete ns test-namespace
 ```
-
-
 
 ## Service
 
@@ -637,7 +599,7 @@ kubectl exec -it [pod-name] -- sh
 curl ip(whoami-deployment对应的ip)
 ```
 
-7. **可以用一下yaml 代替 kubectl expose** 
+7. **可以用一下yaml 代替 kubectl expose**
 
 ```yaml
 apiVersion: v1
@@ -654,13 +616,9 @@ spec:
   type: Cluster
 ```
 
-
-
 ### NodePort Service
 
 如果集群外需要访问集群 pod 内的服务，可以使用 NodePort 类型的 Service。这个方式是通过在各个节点机器上启动一个端口，通过访问该端口的请求转发到 pod内。
-
-
 
 1. **创建 whoami-deployment.yaml 文件**
 
@@ -724,7 +682,7 @@ kubectl get svc
 curl ip:port(node对应的ip+service对应的port)
 ```
 
-7. **可以用一下yaml 代替 kubectl expose** 
+7. **可以用一下yaml 代替 kubectl expose**
 
 ```yaml
 apiVersion: v1
@@ -741,33 +699,113 @@ spec:
   type: NodePort
 ```
 
-
-
 ## Ingress
 
 NodePort虽然能够实现外部访问Pod的需求，但是真的好吗？其实不好，占用了各个物理主机上的端口。
 
 可以使用 Ingress 来解决 NodePort 问题。
 
+使用 rke 安装的方式，可以默认自动安装 `nginx-ingress`。使用其他方式可以参照官网自行安装 `nginx-ingress`。
 
+### http 域名访问
 
+1. **创建 ingress**
 
+```sh
+cat <<EOF> ingress-demo.yaml
+kind: ReplicaSet
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  labels:
+    app: nginx
+spec:
+  selector:
+    app: nginx
+  type: ClusterIP
+  ports:
+    - port: 80
+      protocol: TCP
+      name: http
+      targetPort: 80
 
+---
 
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-test
+spec:
+  rules:
+    - host: bar.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nginx-service
+                port:
+                  number: 80
+  ingressClassName: nginx
 
+EOF
+```
 
+2. **创建 ingress **
 
+```sh
+kubectl apply -f ingress-demo.yaml
+```
 
+3. **查看ingress是否启动成功**
 
+```sh
+kubectl get pod
+kubectl get service
+kubectl get ingress 
+```
 
+4. **配置hosts指向(等同于域名解析) **
 
+```sh
+vim /etc/hosts
+# 添加
+192.168.3.90 bar.com
+```
 
+5. **查看域名解析是否正常**
 
+```sh
+nslookup bar.com
+```
 
+6. **访问域名**
 
+```sh
+curl bar.com
+```
 
-
-
-
-
-
+### https 域名访问
