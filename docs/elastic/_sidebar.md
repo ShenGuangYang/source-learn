@@ -1,3 +1,6 @@
 - [首页](/)
 - [环境搭建](elastic/deploy.md)
+- [ubuntu环境快速搭建](elastic/deploy-ubuntu.md)
 - [索引使用](elastic/indices.md)
+- [字段映射](elastic/mapping.md)
+- [字段数据类型](elastic/mapping-types.md)
