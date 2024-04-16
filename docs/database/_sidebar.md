@@ -1,2 +1,4 @@
 - [首页](/?id=内容简介)
 - [MySQL](database/mysql.md)
+- [postgres](database/postgresql.md)
+- [cassandra](database/cassandra.md)
