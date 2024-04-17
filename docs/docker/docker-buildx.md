@@ -14,8 +14,6 @@ sudo apt install -y qemu-user-static binfmt-support
 docker buildx ls
 ```
 
-
-
 ## 构建多架构镜像
 
 ```shell
@@ -24,8 +22,6 @@ docker buildx build --builder=mybuilder --platform=linux/arm64,linux/amd64 -t xx
 docker buildx rm mybuilder
 ```
 
-
-
 ## 问题处理
 
 如果你用`docker`驱动来构建多平台镜像,会得到以下错误，因为buildx默认使用的是`docker`驱动,这个是不支持多平台构建的.所以我们需要切换使用`--builder=mybuilder`驱动
@@ -33,5 +29,3 @@ docker buildx rm mybuilder
 ```
 ERROR: multiple platforms feature is currently not supported for docker driver. Please switch to a different driver (eg. "docker buildx create --use")
 ```
-
-

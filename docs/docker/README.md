@@ -4,3 +4,4 @@
 - [docker](docker/docker.md)
 - [docker compose](docker/docker-compose.md)
 - [docker 构建多架构镜像](docker/docker-buildx.md)
+- [skopeo 镜像同步](docker/skopeo.md) 
